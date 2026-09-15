@@ -269,6 +269,29 @@ export default createRule<[], MessageId>({
 
       'Program:exit'() {
         for (const [, named] of namespace) {
+          // Type-only specifiers cannot redeclare other explicit exports.
+          for (const [name, nodes] of named) {
+            if (!name.startsWith(tsTypePrefix)) {
+              continue
+            }
+            const valueNodes = named.get(name.slice(tsTypePrefix.length))
+            if (
+              !valueNodes ||
+              [...valueNodes].every(
+                node => node.type === AST_NODE_TYPES.ExportAllDeclaration,
+              )
+            ) {
+              continue
+            }
+            for (const node of nodes) {
+              if (node.parent?.type === AST_NODE_TYPES.ExportSpecifier) {
+                valueNodes.add(node)
+              }
+            }
+          }
+
+          const reported = new Map<string, Set<TSESTree.Node>>()
+
           for (const [name, nodes] of named) {
             if (nodes.size === 0) {
               continue
@@ -284,8 +307,16 @@ export default createRule<[], MessageId>({
               continue
             }
 
+            const exportedName = name.replace(tsTypePrefix, '')
+            const reportedNodes =
+              reported.get(exportedName) || new Set<TSESTree.Node>()
+            reported.set(exportedName, reportedNodes)
+
             for (const node of nodes) {
-              if (shouldSkipTypescriptNamespace(node, nodes)) {
+              if (
+                reportedNodes.has(node) ||
+                shouldSkipTypescriptNamespace(node, nodes)
+              ) {
                 continue
               }
 
@@ -299,10 +330,12 @@ export default createRule<[], MessageId>({
                   node,
                   messageId: 'multiNamed',
                   data: {
-                    name: name.replace(tsTypePrefix, ''),
+                    name: exportedName,
                   },
                 })
               }
+
+              reportedNodes.add(node)
             }
           }
         }

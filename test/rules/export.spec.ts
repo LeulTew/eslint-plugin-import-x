@@ -243,6 +243,13 @@ describe('TypeScript', () => {
         `,
         ...parserConfig,
       }),
+      tValid({
+        code: `
+          export class Foo {}
+          export interface Foo { value: number }
+        `,
+        ...parserConfig,
+      }),
       ...[
         'export type { MyType as foo }',
         'export { type MyType as foo }',
@@ -285,6 +292,43 @@ describe('TypeScript', () => {
       }),
     ],
     invalid: [
+      ...[
+        'export type { MyType as Foo }',
+        'export { type MyType as Foo }',
+      ].flatMap(typeExport =>
+        [
+          'export const Foo = 1',
+          'export class Foo {}',
+          'export enum Foo { Value }',
+          'export namespace Foo { export const value = 1 }',
+          'export { getFoo as Foo } from "./typescript"',
+        ].map(declaration =>
+          tInvalid({
+            code: `
+                ${typeExport} from "./typescript";
+                ${declaration};
+              `,
+            errors: [
+              { messageId: 'multiNamed', data: { name: 'Foo' }, line: 2 },
+              { messageId: 'multiNamed', data: { name: 'Foo' }, line: 3 },
+            ],
+            ...parserConfig,
+          }),
+        ),
+      ),
+      tInvalid({
+        code: `
+          export type { MyType as Foo } from "./typescript";
+          export { type MyType as Foo } from "./typescript";
+          export class Foo {}
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'Foo' }, line: 2 },
+          { messageId: 'multiNamed', data: { name: 'Foo' }, line: 3 },
+          { messageId: 'multiNamed', data: { name: 'Foo' }, line: 4 },
+        ],
+        ...parserConfig,
+      }),
       ...[
         'export type MyType = number',
         'export type { MyType } from "./typescript"',

@@ -197,6 +197,223 @@ describe('TypeScript', () => {
     },
   }
 
+  ruleTester.run('export (type-only)', rule, {
+    valid: [
+      tValid({
+        code: `
+          export type * from "./foo.ts";
+          export { foo } from "./foo.ts";
+        `,
+        filename: testFilePath('export-type-star/bar.ts'),
+        ...parserConfig,
+      }),
+      tValid({
+        code: `
+          export { foo } from "./foo.ts";
+          export type * from "./foo.ts";
+        `,
+        filename: testFilePath('export-type-star/bar.ts'),
+        ...parserConfig,
+      }),
+      tValid({
+        code: `
+          export type * from "./export-type-star/foo";
+          export * from "./export-type-star/foo";
+        `,
+        ...parserConfig,
+      }),
+      tValid({
+        code: `
+          export type * from "./export-type-star/barrel";
+          export { foo } from "./export-type-star/foo";
+        `,
+        ...parserConfig,
+      }),
+      tValid({
+        code: `
+          export type * from "./typescript";
+          export { Bar, MyEnum, MyNamespace, getFoo } from "./typescript";
+        `,
+        ...parserConfig,
+      }),
+      tValid({
+        code: `
+          export type * as Types from "./typescript";
+          export * as Values from "./typescript";
+        `,
+        ...parserConfig,
+      }),
+      ...[
+        'export type { MyType as foo }',
+        'export { type MyType as foo }',
+        'export { type MyType as foo, getFoo }',
+      ].map(declaration =>
+        tValid({
+          code: `
+            ${declaration} from "./typescript";
+            export * from "./export-type-star/foo";
+          `,
+          ...parserConfig,
+        }),
+      ),
+      ...['export type { foo }', 'export { type foo }'].map(declaration =>
+        tValid({
+          code: `
+            type foo = number;
+            ${declaration};
+            export * from "./export-type-star/foo";
+          `,
+          ...parserConfig,
+        }),
+      ),
+      tValid({
+        code: `
+          declare module "a" {
+            type Foo = number;
+            export type { Foo };
+          }
+          declare module "b" {
+            type Foo = string;
+            export { type Foo };
+          }
+        `,
+        ...parserConfig,
+      }),
+      tValid({
+        code: 'export type * from "./does-not-exist"',
+        ...parserConfig,
+      }),
+    ],
+    invalid: [
+      ...[
+        'export type MyType = number',
+        'export type { MyType } from "./typescript"',
+        'export { type MyType } from "./typescript"',
+        'export type * from "./export-type-star/types"',
+      ].map(declaration =>
+        tInvalid({
+          code: `
+            export type * from "./typescript";
+            ${declaration};
+          `,
+          errors: [
+            { messageId: 'multiNamed', data: { name: 'MyType' }, line: 2 },
+            { messageId: 'multiNamed', data: { name: 'MyType' }, line: 3 },
+          ],
+          ...parserConfig,
+        }),
+      ),
+      ...['export type { MyType as Foo }', 'export { type MyType as Foo }'].map(
+        declaration =>
+          tInvalid({
+            code: `
+            ${declaration} from "./typescript";
+            export type Foo = number;
+          `,
+            errors: [
+              { messageId: 'multiNamed', data: { name: 'Foo' }, line: 2 },
+              { messageId: 'multiNamed', data: { name: 'Foo' }, line: 3 },
+            ],
+            ...parserConfig,
+          }),
+      ),
+      tInvalid({
+        code: `
+          export type { MyType as Foo } from "./typescript";
+          export { type MyType as Foo } from "./typescript";
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'Foo' }, line: 2 },
+          { messageId: 'multiNamed', data: { name: 'Foo' }, line: 3 },
+        ],
+        ...parserConfig,
+      }),
+      tInvalid({
+        code: `
+          export type * from "./typescript";
+          export type { Bar, MyEnum } from "./typescript";
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'MyEnum' }, line: 2 },
+          { messageId: 'multiNamed', data: { name: 'Bar' }, line: 2 },
+          { messageId: 'multiNamed', data: { name: 'Bar' }, line: 3 },
+          { messageId: 'multiNamed', data: { name: 'MyEnum' }, line: 3 },
+        ],
+        ...parserConfig,
+      }),
+      tInvalid({
+        code: `
+          export type * from "./typescript";
+          export { Bar, MyEnum } from "./typescript";
+          export { Bar, MyEnum } from "./typescript";
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'Bar' }, line: 3 },
+          { messageId: 'multiNamed', data: { name: 'MyEnum' }, line: 3 },
+          { messageId: 'multiNamed', data: { name: 'Bar' }, line: 4 },
+          { messageId: 'multiNamed', data: { name: 'MyEnum' }, line: 4 },
+        ],
+        ...parserConfig,
+      }),
+      tInvalid({
+        code: `
+          export { type MyType, getFoo } from "./typescript";
+          export { getFoo } from "./typescript";
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'getFoo' }, line: 2 },
+          { messageId: 'multiNamed', data: { name: 'getFoo' }, line: 3 },
+        ],
+        ...parserConfig,
+      }),
+      tInvalid({
+        code: `
+          export * from "./export-type-star/foo";
+          export { foo } from "./export-type-star/foo";
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'foo' }, line: 2 },
+          { messageId: 'multiNamed', data: { name: 'foo' }, line: 3 },
+        ],
+        ...parserConfig,
+      }),
+      tInvalid({
+        code: `
+          declare module "a" {
+            export type { MyType as Foo } from "./typescript";
+            export type Foo = number;
+          }
+          export type Foo = string;
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'Foo' }, line: 3 },
+          { messageId: 'multiNamed', data: { name: 'Foo' }, line: 4 },
+        ],
+        ...parserConfig,
+      }),
+      tInvalid({
+        code: `
+          export type { MyType as default } from "./typescript";
+          export { type Foo as default } from "./typescript";
+          export default 1;
+        `,
+        errors: [
+          { messageId: 'multiDefault', line: 2 },
+          { messageId: 'multiDefault', line: 3 },
+          { messageId: 'multiDefault', line: 4 },
+        ],
+        ...parserConfig,
+      }),
+      tInvalid({
+        code: 'export type * from "./default-export"',
+        errors: [
+          { messageId: 'noNamed', data: { module: './default-export' } },
+        ],
+        ...parserConfig,
+      }),
+    ],
+  })
+
   ruleTester.run('export', rule, {
     valid: [
       // type/value name clash

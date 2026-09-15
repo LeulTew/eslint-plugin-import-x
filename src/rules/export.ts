@@ -149,7 +149,8 @@ export default createRule<[], MessageId>({
 
       const named = namespace.get(parent)!
 
-      const key = isType ? `${tsTypePrefix}${name}` : name
+      // Type-only exports still share the module's single default export.
+      const key = isType && name !== 'default' ? `${tsTypePrefix}${name}` : name
 
       let nodes = named.get(key)
 
@@ -181,6 +182,7 @@ export default createRule<[], MessageId>({
           getValue(node.exported),
           node.exported,
           getParent(node.parent!),
+          node.exportKind === 'type' || node.parent!.exportKind === 'type',
         )
       },
 
@@ -252,7 +254,7 @@ export default createRule<[], MessageId>({
         remoteExports.$forEach((_, name) => {
           if (name !== 'default') {
             any = true // poor man's filter
-            addNamed(name, node, parent)
+            addNamed(name, node, parent, node.exportKind === 'type')
           }
         })
 

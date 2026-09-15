@@ -34,6 +34,20 @@ as at least `n-1` of them are clearly mistakes, but it is not clear which one
 (if any) is intended. Could be the result of copy/paste, code duplication with
 intent to rename, etc.
 
+### TypeScript
+
+Type-only exports are checked separately from value exports. Given a module
+`foo.ts` that exports a value named `foo`, these re-exports do not conflict:
+
+```ts
+export type * from './foo.ts'
+export { foo } from './foo.ts'
+```
+
+Both `export type { Foo }` and `export { type Foo }` are also checked in the
+type namespace. Duplicate type exports are still reported. Default exports,
+including type-only default exports, must remain unique.
+
 ## Further Reading
 
 - Lee Byron's [ES7] export proposal

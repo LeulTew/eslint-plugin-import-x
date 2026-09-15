@@ -29,6 +29,7 @@ ambient namespaces:
 
 const rootProgram = 'root'
 const tsTypePrefix = 'type:'
+const valuePrefix = 'value:'
 
 /**
  * Remove function overloads like:
@@ -150,7 +151,8 @@ export default createRule<[], MessageId>({
       const named = namespace.get(parent)!
 
       // Type-only exports still share the module's single default export.
-      const key = isType && name !== 'default' ? `${tsTypePrefix}${name}` : name
+      const prefix = isType && name !== 'default' ? tsTypePrefix : valuePrefix
+      const key = `${prefix}${name}`
 
       let nodes = named.get(key)
 
@@ -274,7 +276,9 @@ export default createRule<[], MessageId>({
             if (!name.startsWith(tsTypePrefix)) {
               continue
             }
-            const valueNodes = named.get(name.slice(tsTypePrefix.length))
+            const valueNodes = named.get(
+              `${valuePrefix}${name.slice(tsTypePrefix.length)}`,
+            )
             if (
               !valueNodes ||
               [...valueNodes].every(
@@ -307,7 +311,11 @@ export default createRule<[], MessageId>({
               continue
             }
 
-            const exportedName = name.replace(tsTypePrefix, '')
+            const exportedName = name.slice(
+              name.startsWith(tsTypePrefix)
+                ? tsTypePrefix.length
+                : valuePrefix.length,
+            )
             const reportedNodes =
               reported.get(exportedName) || new Set<TSESTree.Node>()
             reported.set(exportedName, reportedNodes)
@@ -320,7 +328,7 @@ export default createRule<[], MessageId>({
                 continue
               }
 
-              if (name === 'default') {
+              if (exportedName === 'default') {
                 context.report({
                   node,
                   messageId: 'multiDefault',

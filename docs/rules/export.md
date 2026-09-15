@@ -34,6 +34,9 @@ as at least `n-1` of them are clearly mistakes, but it is not clear which one
 (if any) is intended. Could be the result of copy/paste, code duplication with
 intent to rename, etc.
 
+String-literal export names are compared in full. For example, `"type:Foo"`
+and `Foo` are distinct names.
+
 ### TypeScript
 
 Type-only wildcard exports are checked separately from value exports. Given

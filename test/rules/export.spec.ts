@@ -15,6 +15,19 @@ const ruleTester = new TSESLintRuleTester()
 
 const { tValid, tInvalid } = createRuleTestCaseFunctions<typeof rule>()
 
+const literalExportNames = [
+  'type:Foo',
+  'value:Foo',
+  'type:type:Foo',
+  'value:value:Foo',
+  'type:value:Foo',
+  'value:type:Foo',
+  'Foo:type:Bar',
+  'Foo:value:Bar',
+  'type:default',
+  'value:default',
+]
+
 ruleTester.run('export', rule, {
   valid: [
     tValid({
@@ -189,6 +202,76 @@ ruleTester.run('export', rule, {
   ],
 })
 
+for (const { name, parser } of [
+  { name: 'Espree', parser: parsers.ESPREE },
+  { name: 'TypeScript', parser: parsers.TS },
+]) {
+  const { tValid: literalValid, tInvalid: literalInvalid } =
+    createRuleTestCaseFunctions<typeof rule>({
+      languageOptions: {
+        ...(parser === parsers.TS ? {} : { parser: cjsRequire(parser) }),
+        parserOptions: { ecmaVersion: 2022 },
+      },
+    })
+
+  ruleTester.run(`export (literal names, ${name})`, rule, {
+    valid: [
+      ...literalExportNames.flatMap(name => [
+        literalValid({
+          name: `preserves literal ${name} before Foo`,
+          code: `const local = 1; const Foo = 2; export { local as "${name}", Foo };`,
+        }),
+        literalValid({
+          name: `preserves literal ${name} after Foo`,
+          code: `const local = 1; const Foo = 2; export { Foo, local as "${name}" };`,
+        }),
+      ]),
+      literalValid({
+        code: `
+          export { Foo as "type:Foo" } from "./export-name-prefixes";
+          export { Foo } from "./export-name-prefixes";
+        `,
+      }),
+      literalValid({
+        code: `
+          const local = 1;
+          export { local as "type:default", local as "value:default" };
+          export default 2;
+        `,
+      }),
+      literalValid({
+        code: 'export * from "./export-name-prefixes"',
+      }),
+    ],
+    invalid: [
+      ...literalExportNames.map(name =>
+        literalInvalid({
+          code: `
+            export { Foo as "${name}" } from "./export-name-prefixes";
+            export * from "./export-name-prefixes";
+          `,
+          errors: [
+            { messageId: 'multiNamed', data: { name }, line: 2 },
+            { messageId: 'multiNamed', data: { name }, line: 3 },
+          ],
+        }),
+      ),
+      literalInvalid({
+        code: `
+          export { Foo, Foo as "type:Foo" } from "./export-name-prefixes";
+          export * from "./export-name-prefixes";
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'Foo' }, line: 2 },
+          { messageId: 'multiNamed', data: { name: 'type:Foo' }, line: 2 },
+          { messageId: 'multiNamed', data: { name: 'Foo' }, line: 3 },
+          { messageId: 'multiNamed', data: { name: 'type:Foo' }, line: 3 },
+        ],
+      }),
+    ],
+  })
+}
+
 describe('TypeScript', () => {
   const parserConfig = {
     settings: {
@@ -196,6 +279,80 @@ describe('TypeScript', () => {
       'import-x/resolver': { 'eslint-import-resolver-typescript': true },
     },
   }
+
+  ruleTester.run('export (literal type names)', rule, {
+    valid: [
+      tValid({
+        code: `
+          const local = 1;
+          export type Foo = number;
+          export { local as "type:Foo" };
+        `,
+        ...parserConfig,
+      }),
+      tValid({
+        code: `
+          const local = 1;
+          export { local as "type:Foo" };
+          export type Foo = number;
+        `,
+        ...parserConfig,
+      }),
+      ...['export type { Foo }', 'export { type Foo }'].map(declaration =>
+        tValid({
+          code: `
+            type Foo = number;
+            const local = 1;
+            ${declaration};
+            export { local as "type:Foo" };
+          `,
+          ...parserConfig,
+        }),
+      ),
+      tValid({
+        code: `
+          export type * from "./export-name-prefixes";
+          export { Foo, Foo as "type:Foo" } from "./export-name-prefixes";
+        `,
+        ...parserConfig,
+      }),
+    ],
+    invalid: [
+      ...literalExportNames.flatMap(name =>
+        [
+          `export type { Foo as "${name}" }`,
+          `export { type Foo as "${name}" }`,
+        ].map(declaration =>
+          tInvalid({
+            code: `
+              type Foo = number;
+              const local = 1;
+              ${declaration};
+              export { local as "${name}" };
+            `,
+            errors: [
+              { messageId: 'multiNamed', data: { name }, line: 4 },
+              { messageId: 'multiNamed', data: { name }, line: 5 },
+            ],
+            ...parserConfig,
+          }),
+        ),
+      ),
+      tInvalid({
+        code: `
+          type Foo = number;
+          const local = 1;
+          export type { Foo as "default" };
+          export { local as default };
+        `,
+        errors: [
+          { messageId: 'multiDefault', line: 4 },
+          { messageId: 'multiDefault', line: 5 },
+        ],
+        ...parserConfig,
+      }),
+    ],
+  })
 
   ruleTester.run('export (type-only)', rule, {
     valid: [

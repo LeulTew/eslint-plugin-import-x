@@ -60,25 +60,19 @@ interface ModuleReexport {
   isTypeOnly?: boolean
 }
 
+const declarationKinds = new Map<string, ExportNamespaceKind>([
+  ['TSTypeAliasDeclaration', 'type'],
+  ['TSInterfaceDeclaration', 'type'],
+  ['TypeAlias', 'type'],
+  ['InterfaceDeclaration', 'type'],
+  ['ClassDeclaration', 'both'],
+  ['TSAbstractClassDeclaration', 'both'],
+  ['TSEnumDeclaration', 'both'],
+  ['TSModuleDeclaration', 'both'],
+])
+
 function declarationExportKind(node: TSESTree.Node): ExportNamespaceKind {
-  const type: string = node.type
-  switch (type) {
-    case 'TSTypeAliasDeclaration':
-    case 'TSInterfaceDeclaration':
-    case 'TypeAlias':
-    case 'InterfaceDeclaration': {
-      return 'type'
-    }
-    case 'ClassDeclaration':
-    case 'TSAbstractClassDeclaration':
-    case 'TSEnumDeclaration':
-    case 'TSModuleDeclaration': {
-      return 'both'
-    }
-    default: {
-      return 'value'
-    }
-  }
+  return declarationKinds.get(node.type) ?? 'value'
 }
 
 function typeOnlyKind(kind: ExportNamespaceKind): ExportNamespaceKind {

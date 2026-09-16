@@ -43,14 +43,41 @@ const valuePrefix = 'value:'
  * ```
  */
 function removeTypescriptFunctionOverloads(nodes: Set<TSESTree.Node>) {
+  let overload: TSESTree.Node | undefined
+  let hasImplementation = false
   for (const node of nodes) {
     const declType =
       node.type === AST_NODE_TYPES.ExportDefaultDeclaration
         ? node.declaration.type
         : node.parent?.type
     if (declType === AST_NODE_TYPES.TSDeclareFunction) {
+      overload ??= node
       nodes.delete(node)
+    } else if (declType === AST_NODE_TYPES.FunctionDeclaration) {
+      hasImplementation = true
     }
+  }
+
+  if (
+    overload &&
+    !hasImplementation &&
+    [...nodes].some(node => {
+      if (
+        node.parent?.type === AST_NODE_TYPES.TSModuleDeclaration ||
+        ('exportKind' in node && node.exportKind === 'type')
+      ) {
+        return false
+      }
+      const specifier = node.parent
+      return (
+        specifier?.type !== AST_NODE_TYPES.ExportSpecifier ||
+        (specifier.exportKind !== 'type' &&
+          specifier.parent?.exportKind !== 'type')
+      )
+    })
+  ) {
+    // Ambient type aliases can merge with signatures, but distinct values cannot.
+    nodes.add(overload)
   }
 }
 
@@ -256,7 +283,11 @@ export default createRule<[], MessageId>({
         remoteExports.$forEach((_, name) => {
           if (name !== 'default') {
             any = true // poor man's filter
-            addNamed(name, node, parent, node.exportKind === 'type')
+            const kind = remoteExports.getExportKind(name)
+            const isType = node.exportKind === 'type'
+            if (kind !== 'none' && (!isType || kind !== 'value')) {
+              addNamed(name, node, parent, isType || kind === 'type')
+            }
           }
         })
 

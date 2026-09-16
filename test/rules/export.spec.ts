@@ -354,6 +354,146 @@ describe('TypeScript', () => {
     ],
   })
 
+  ruleTester.run('export (ambient overloads)', rule, {
+    valid: [
+      tValid({
+        filename: testFilePath('overloads.d.ts'),
+        code: `
+          type T = number;
+          export type { T as default };
+          export default function foo(a: string): string;
+          export default function foo(a: number): number;
+        `,
+      }),
+      tValid({
+        filename: testFilePath('overloads.d.ts'),
+        code: `
+          export { type MyType as Foo } from "./export-type-star/types";
+          export declare function Foo(a: string): string;
+          export declare function Foo(a: number): number;
+        `,
+        ...parserConfig,
+      }),
+    ],
+    invalid: [
+      tInvalid({
+        filename: testFilePath('overloads.d.ts'),
+        code: `
+          declare const value: number;
+          export { value as default };
+          export default function foo(a: string): string;
+          export default function foo(a: number): number;
+        `,
+        errors: [
+          { messageId: 'multiDefault', line: 3 },
+          { messageId: 'multiDefault', line: 4 },
+        ],
+      }),
+      tInvalid({
+        filename: testFilePath('overloads.d.ts'),
+        code: `
+          declare const value: number;
+          export { value as Foo };
+          export declare function Foo(a: string): string;
+          export declare function Foo(a: number): number;
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'Foo' }, line: 3 },
+          { messageId: 'multiNamed', data: { name: 'Foo' }, line: 4 },
+        ],
+      }),
+    ],
+  })
+
+  ruleTester.run('export (resolved namespaces)', rule, {
+    valid: [
+      ...['foo', 'barrel', 'ordinary-star', 'type-star', 'cycle-a'].map(
+        source =>
+          tValid({
+            code: `
+              export type * from "./export-type-star/${source}";
+              export type foo = number;
+            `,
+            ...parserConfig,
+          }),
+      ),
+      tValid({
+        code: `
+          export type * from "./export-type-star/aliases";
+          export type RenamedValue = number;
+          export type ImportedValue = number;
+          export type TypeValue = number;
+        `,
+        ...parserConfig,
+      }),
+      tValid({
+        code: `
+          export * from "./export-type-star/type-star";
+          export { foo, C, E } from "./export-type-star/mixed";
+        `,
+        ...parserConfig,
+      }),
+      tValid({
+        code: `
+          export * from "./export-type-star/types";
+          export const MyType = 1;
+        `,
+        ...parserConfig,
+      }),
+    ],
+    invalid: [
+      ...['T', 'I', 'C', 'E', 'N'].map(name =>
+        tInvalid({
+          code: `
+            export type * from "./export-type-star/mixed";
+            export type { ${name} } from "./export-type-star/mixed";
+          `,
+          errors: [
+            { messageId: 'multiNamed', data: { name }, line: 2 },
+            { messageId: 'multiNamed', data: { name }, line: 3 },
+          ],
+          ...parserConfig,
+        }),
+      ),
+      ...['ImportedType', 'RenamedDefault', 'LocalType', 'TypeClass'].map(
+        name =>
+          tInvalid({
+            code: `
+              export type * from "./export-type-star/aliases";
+              export type { ${name} } from "./export-type-star/aliases";
+            `,
+            errors: [
+              { messageId: 'multiNamed', data: { name }, line: 2 },
+              { messageId: 'multiNamed', data: { name }, line: 3 },
+            ],
+            ...parserConfig,
+          }),
+      ),
+      tInvalid({
+        code: `
+          export * from "./export-type-star/type-star";
+          export type { RenamedClass } from "./export-type-star/aliases";
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'RenamedClass' }, line: 2 },
+          { messageId: 'multiNamed', data: { name: 'RenamedClass' }, line: 3 },
+        ],
+        ...parserConfig,
+      }),
+      tInvalid({
+        code: `
+          export type * from "./export-type-star/cycle-a";
+          export type CycleType = number;
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'CycleType' }, line: 2 },
+          { messageId: 'multiNamed', data: { name: 'CycleType' }, line: 3 },
+        ],
+        ...parserConfig,
+      }),
+    ],
+  })
+
   ruleTester.run('export (type-only)', rule, {
     valid: [
       tValid({

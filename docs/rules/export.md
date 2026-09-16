@@ -48,11 +48,20 @@ export type * from './foo.ts'
 export { foo } from './foo.ts'
 ```
 
+Value-only members are not included in type-only wildcard duplicate checks.
+They also do not conflict with a local type declaration of the same name.
+Type declarations and the type side of classes, enums, and namespaces are
+tracked through named re-exports and wildcard barrels.
+
 Both `export type { Foo }` and `export { type Foo }` are also checked in the
-type namespace. They cannot redeclare another explicit export of `Foo`,
-including a value, class, enum, or namespace. Duplicate type exports are
-still reported. Default exports, including type-only default exports, must
-remain unique.
+type namespace. Duplicate types and conflicts with explicit value, class,
+enum, or namespace exports are reported, subject to declaration merging and
+overload handling. Duplicate default exports, including type-only defaults,
+are also checked.
+
+Overload signatures describe one function rather than additional exports.
+Ambient type-only aliases may coexist with overload-only declarations;
+conflicting explicit value exports are still reported.
 
 ## Further Reading
 

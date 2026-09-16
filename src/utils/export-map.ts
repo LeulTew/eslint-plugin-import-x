@@ -66,15 +66,18 @@ function declarationExportKind(node: TSESTree.Node): ExportNamespaceKind {
     case 'TSTypeAliasDeclaration':
     case 'TSInterfaceDeclaration':
     case 'TypeAlias':
-    case 'InterfaceDeclaration':
+    case 'InterfaceDeclaration': {
       return 'type'
+    }
     case 'ClassDeclaration':
     case 'TSAbstractClassDeclaration':
     case 'TSEnumDeclaration':
-    case 'TSModuleDeclaration':
+    case 'TSModuleDeclaration': {
       return 'both'
-    default:
+    }
+    default: {
       return 'value'
+    }
   }
 }
 

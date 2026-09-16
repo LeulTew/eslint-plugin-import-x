@@ -287,6 +287,9 @@ export default createRule<[], MessageId>({
             const isType = node.exportKind === 'type'
             if (kind !== 'none' && (!isType || kind !== 'value')) {
               addNamed(name, node, parent, isType || kind === 'type')
+              if (!isType && kind === 'both') {
+                addNamed(name, node, parent, true)
+              }
             }
           }
         })

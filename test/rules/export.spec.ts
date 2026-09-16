@@ -442,6 +442,35 @@ describe('TypeScript', () => {
       }),
     ],
     invalid: [
+      ...[
+        { name: 'C', declaration: 'export type { C }' },
+        { name: 'E', declaration: 'export { type E }' },
+      ].map(({ name, declaration }) =>
+        tInvalid({
+          code: `
+            export * from "./export-type-star/mixed";
+            ${declaration} from "./export-type-star/mixed";
+          `,
+          errors: [
+            { messageId: 'multiNamed', data: { name }, line: 2 },
+            { messageId: 'multiNamed', data: { name }, line: 3 },
+          ],
+          ...parserConfig,
+        }),
+      ),
+      tInvalid({
+        code: `
+          export * from "./export-type-star/mixed";
+          export type { C } from "./export-type-star/mixed";
+          export { C } from "./export-type-star/mixed";
+        `,
+        errors: [
+          { messageId: 'multiNamed', data: { name: 'C' }, line: 2 },
+          { messageId: 'multiNamed', data: { name: 'C' }, line: 3 },
+          { messageId: 'multiNamed', data: { name: 'C' }, line: 4 },
+        ],
+        ...parserConfig,
+      }),
       ...['T', 'I', 'C', 'E', 'N'].map(name =>
         tInvalid({
           code: `
